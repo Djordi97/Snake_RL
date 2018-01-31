@@ -2,18 +2,21 @@ from gameobjects import GameObject
 from move import Move, Direction
 
 
-    class Agent:
+class Agent:
 
     board_height = 5
-
+    direction = None
+    utilities = []
+    updatedutilities = []
 
     def __init__(self):
         """" Constructor of the Agent, can be used to set up variables """
         global counter
         counter = 0
-        utilities = []
         for i in range(0,25):
-            utilities[i] = 0
+            Agent.utilities.append(0)
+        for i in range(0,25):
+            Agent.updatedutilities.append(0)
 
     def getFood(board):
         global food
@@ -23,7 +26,7 @@ from move import Move, Direction
                     food = (x,y)
 
     def validMove(x,y):
-        return(x>=0 and x<=Agent.board_height and y>=0 and y<=Agent.board_height)
+        return(x>=0 and x<Agent.board_height and y>=0 and y<Agent.board_height)
 
     def determineMove(direction, moveToMake, position):
         global move
@@ -36,40 +39,105 @@ from move import Move, Direction
             move = Move.STRAIGHT
 
     def setNewDirection():
-        Agent.currentDirection = Agent.currentDirection.get_new_direction(move)
-        Agent.current = best
+        Agent.direction = Agent.direction.get_new_direction(move)
 
     def bestMove(x,y,board):
         global best
         util = -100
-        best = None
+        best = (0,0)
         for i in range(0, len(list_man)):
             new_x = x+list_man[i][0]
             new_y = y+list_man[i][1]
             if(Agent.validMove(new_x, new_y)):
-                if not(Agent.board[x][y] == GameObject.WALL):
-                    if(utilities[Agent.board_height * new_x + new_y] > util):
+                if not(board[x][y] == GameObject.WALL):
+                    if(Agent.updatedutilities[Agent.board_height * new_x + new_y] > util):
                         best = (new_x, new_y)
-                        util = utilities[Agent.board_height * new_x + new_y]
+                        util = Agent.updatedutilities[Agent.board_height * new_x + new_y]
     def updateBoard(board):
         gamma = 0.8
-        reward = 0.04
-        for i in range(0, board_height*board_height):
-            utilities[i] = reward
-
-
+        reward = -0.04
+        for x in range (0,5):
+            for y in range (0,5):
+                i = Agent.board_height * x + y
+                #up (0,+1)
+                if(Agent.validMove(x,y+1) == False):
+                    up = Agent.utilities[i]
+                    print("up not valid", up)
+                elif(board[x][y+1] == GameObject.WALL):
+                    up = -100
+                    print(up)
+                else:
+                    up = Agent.utilities[Agent.board_height * x + y+1]
+                    print("up valid", up)
+                #down (0,-1)
+                if(Agent.validMove(x,y-1) == False):
+                    down = Agent.utilities[i]
+                    print("down not valid", down)
+                elif(board[x][y-1] == GameObject.WALL):
+                    down = -100
+                    print(down)
+                else:
+                    down = Agent.utilities[Agent.board_height * x + y-1]
+                    print("down valid", down)
+                #right(1,0)
+                if(Agent.validMove(x+1,y) == False):
+                    right = Agent.utilities[i]
+                    print("right not valid", right)
+                elif(board[x+1][y] == GameObject.WALL):
+                    right = -100
+                    print(right)
+                else:
+                    right = Agent.utilities[Agent.board_height * (x+1) + y]
+                    print("right valid", right)
+                #left(-1,0)
+                if(Agent.validMove(x-1,y) == False):
+                    left = Agent.utilities[i]
+                    print("left not valid", left)
+                elif(board[x-1][y] == GameObject.WALL):
+                        up = -100
+                else:
+                    left = Agent.utilities[Agent.board_height * (x-1) + y]
+                    print(" left valid", left)
+                if(up >= down and up >= right and up >= left):
+                    Agent.updatedutilities[i] = Agent.utilities[i] + reward + gamma * (0.8 * up + 0.1 * right + 0.1 * left)
+                    print("up")
+                elif(down >= up and down >= right and down >= left):
+                    Agent.updatedutilities[i] = Agent.utilities[i] + reward + gamma * (0.8 * down + 0.1 * right + 0.1 * left)
+                    print("down")
+                elif(right >= up and right >= down and right >= left):
+                    Agent.updatedutilities[i] = Agent.utilities[i] + reward + gamma * (0.8 * right + 0.1 * down + 0.1 * up)
+                    print("right")
+                else:
+                    Agent.updatedutilities[i] = Agent.utilities[i] + reward + gamma * (0.8 * left + 0.1 * down + 0.1 * up)
+                    print("left")
+                print(i, "utility", Agent.updatedutilities[i])
 
 
     def get_move(self, board, score, turns_alive, turns_to_starve, direction, head_position, body_parts):
         global reward, list_man, initial
-
+        print(len(Agent.utilities))
+        Agent.direction = direction
         initial = head_position
-        Agent.updateboard()
+        Agent.getFood(board)
+        Agent.updateBoard(board)
         Agent.utilities[Agent.board_height * food[0]+ food[1]] = 1
+        Agent.updatedutilities[Agent.board_height * food[0]+ food[1]] = 1
+        print("board", Agent.updatedutilities)
         list_man = Agent.direction.get_xy_moves()
         Agent.bestMove(initial[0],initial[1],board)
         Agent.determineMove(direction, best, initial)
+        Agent.setNewDirection()
+        for i in range (0,25):
+            Agent.utilities[i] = Agent.updatedutilities[i]
+        if(best == food):
+            utilities = []
+            updatedutilities = []
+            for i in range(0,25):
+                Agent.utilities.append(0)
+            for i in range(0,25):
+                Agent.updatedutilities.append(0)
 
+        return move
 
         """This function behaves as the 'brain' of the snake. You only need to change the code in this function for
         the project. Every turn the agent needs to return a move. This move will be executed by the snake. If this
@@ -84,7 +152,6 @@ from move import Move, Direction
         of the snake is located there) and GameObject.SNAKE_BODY (meaning there is a body part of the snake there.
         TIP: also, do not run into these). The snake will also die when it tries to escape the board (moving out of
         the boundaries of the array)
-
         :param score: The current score as an integer. Whenever the snake eats, the score will be increased by one.
         When the snake tragically dies (i.e. by running its head into a wall) the score will be reset. In ohter
         words, the score describes the score of the current (alive) worm.
@@ -111,7 +178,6 @@ from move import Move, Direction
         Move.LEFT and Move.RIGHT changes the direction of the snake. In example, if the snake is facing north and the
         move left is made, the snake will go one block to the left and change its direction to west.
         """
-        return Move.STRAIGHT
 
     def should_redraw_board(self):
         """
@@ -121,7 +187,7 @@ from move import Move, Direction
 
         :return: True if the board should be redrawn, False if the board should not be redrawn.
         """
-        return False
+        return True
 
     def should_grow_on_food_collision(self):
         """
@@ -132,8 +198,9 @@ from move import Move, Direction
         """
         return False
 
-    def on_die(self, head_position, board, score, body_parts)
-        counter = counter + 1
+    def on_die(self, head_position, board, score, body_parts):
+
+
 
         """This function will be called whenever the snake dies. After its dead the snake will be reincarnated into a
         new snake and its life will start over. This means that the next time the get_move function is called,
